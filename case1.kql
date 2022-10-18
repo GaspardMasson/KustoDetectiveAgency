@@ -1,0 +1,8 @@
+// case1:
+Shelves
+| mv-expand rf_ids
+| extend rf_ids = tostring(rf_ids)
+| join kind=inner Books on $left.rf_ids == $right.rf_id
+| summarize sum(weight_gram) by shelf,total_weight
+| where sum_weight_gram + 200 < total_weight  // +200 because of the weight of the shelf itself
+| project shelf
