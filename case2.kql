@@ -1,0 +1,11 @@
+//case 2:
+let CorrectVotes =  Votes
+                    | where vote == "Poppy"
+                    | distinct datetime_part("hour",Timestamp), datetime_part("minute",Timestamp), via_ip
+                    | union (Votes | where vote !="Poppy");
+CorrectVotes
+| summarize Count=count() by vote
+| as hint.materialized=true T
+| extend Total = toscalar(T | summarize sum(Count))
+| project vote, Percentage = round(Count*100.0 / Total, 1), Count
+| order by Count
