@@ -1,0 +1,87 @@
+ChatLogs
+| project  heure = strcat(datetime_part("Hour",Timestamp),":",datetime_part("Minute",Timestamp)),Timestamp,Message, user =split(Message,"'")[1],serveur = split(Message,"'")[3]
+| summarize cc=dcount(tostring(user)) by tostring(serveur),heure
+| where cc == 4 
+| join kind= inner (ChatLogs
+| project  Timestamp,Message, user =split(Message,"'")[1],serveur = split(Message,"'")[3]
+| summarize cc=dcount(tostring(user)) by tostring(serveur)
+| where cc == 4 ) on serveur
+
+
+// Idea : The gang log at the same time on the same server
+// We check what are the severs with 4 logs at a specific hour and that have only 4 distinct members
+
+ChatLogs
+| where Message has "channel"
+| parse Message with "User '" User:string "'" * "channel '" Channel:string "'" *
+| extend Time = strcat(datetime_part("Hour",Timestamp),":",datetime_part("Minute",Timestamp))
+| summarize _Count = dcount(User) by Channel,Time
+| where _Count == 4
+| join kind=inner ( ChatLogs
+                    | where Message has "channel"
+                    | parse Message with "User '" User:string "'" * "channel '" Channel:string "'" *
+                    | extend Time = strcat(datetime_part("Hour",Timestamp),":",datetime_part("Minute",Timestamp))
+                    | summarize _Count = dcount(User) by Channel
+                    | where _Count == 4) on Channel
+
+// We can see that only the Channel 'cf053de3c7b' at time (14:25,14:24 & 14:22) fits our hypothesis 
+// Now we have to get the 4 IP's
+
+let _ListIP =
+ChatLogs
+| parse Message with "User '" User:string "'" * "channel '" Channel:string "'" *
+| where Channel == "cf053de3c7b"
+| distinct User;
+ChatLogs
+| where Message has "logged in from"
+| parse Message with "User '" User:string "'" * "from '" IP:string "'" *
+| where User in (_ListIP)
+| distinct IP
+
+// The IP's are : 119.10.30.154, 194.243.69.176, 236.48.237.42, 146.49.19.37
+// Use : https://sneakinto.z13.web.core.windows.net/<ip>
+
+// In the videos and document, we learn that the gang want to steal a datawarehouse
+// For the location : In one document, a picture has a cross drawn on it (the image3), download it and put it in the website : https://tool.geoimgr.com/ (lon:-3,38010413333333, lat:58,9688665166667)
+// For the date : Get the date when the picture was taken in metadata (9th of July 2020) and use the result of case #4 on the PS: of case #5 with the function ReadMessage()
+
+let ReadMessage = (Message:string, Key:string) 
+{
+    let m = Message; let K = Key; let l = toscalar(print s = split(split(K,':')[1], ',') | mv-expand s | summarize make_list(tolong(s)));
+    let ma = (i1:long, i2:long) { make_string(repeat(tolong(l[i1])-tolong(l[i2]), 1))}; 
+    let ms = (d:dynamic, s:long, e:long) { make_string(array_slice(d, s, e)) };   
+    let mc = m has '...';
+    print s=split(split(replace_regex(m, @'[\s\?]+', ' '),substring(K,9,3))[1], ' ')
+    | mv-expand with_itemindex=r s to typeof(string) | serialize 
+    | where r in (l)
+    | extend s = iif(r-1 == prev(r), replace_string(strcat(prev(s), s),'o','ou'), s)
+    | where (r+1 != next(r))
+    | summarize s=strcat_array(make_list(s), iff(mc, '+%2B', ' '))
+    | extend k = series_subtract(series_add(to_utf8(K), l), repeat(23, 10))
+    | project result=iif(mc, strcat(ms(k,0,3), ma(8,2), ms(k,4,6), ms(l,8,8), ms(k,7,7), ma(8,0), s), s)
+};
+ReadMessage(
+```
+Hi there! How are you?
+
+PS:
+Feeling uncomfortable and wondering about an elephant in the room: why would I help you?
+Nothing escapes you, ha?
+Let’s put it this way: we live in a circus full of competition. I can use some of your help, and nothing breaks if you use mine... You see, everything is about symbiosis.
+Anyway, what do you have to lose? Look on an illustrated past, fast forward N days and realize the future is here.
+```,
+h@'wytaPUJM!PS:2,7,17,29,42,49,58,59,63')
+
+// It gives you this link: bing.com?q=uncomfortable+%2Belephant+%2Bescapes+%2Bcircus+%2Bbreaks+%2Beverything+%2Btoulouse+%2Billustrated
+// And you can find the Year 1891
+
+// Now you can find the final date:
+
+print 1891%1000;
+
+let _date = datetime("2020-07-09");
+print _date + 891d
+
+// The heist date is 17th of December 2022
+
+// To make your answer fit in the website, you need to shuffle lat and long and round them to 6 digits. You also need to put the date in format yyyy-mm-dd 
